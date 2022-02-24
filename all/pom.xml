@@ -25,7 +25,7 @@
     <parent>
         <groupId>com.adobe.cq</groupId>
         <artifactId>core.email.components.parent</artifactId>
-        <version>2.17.15-SNAPSHOT</version>
+        <version>0.2.0</version>
         <relativePath>../parent/pom.xml</relativePath>
     </parent>
 
@@ -33,7 +33,7 @@
     <!-- P R O J E C T  D E S C R I P T I O N                                   -->
     <!-- ====================================================================== -->
     <artifactId>core.email.components.all</artifactId>
-    <version>2.17.15-SNAPSHOT</version>
+    <version>0.2.0</version>
     <packaging>content-package</packaging>
 
     <name>Adobe Experience Manager Core Email Components Full Package</name>
@@ -58,17 +58,17 @@
                             <goal>generate-metadata</goal>
                         </goals>
                         <configuration>
-                            <embeddedTarget>/apps/core/wcm/install</embeddedTarget>
+                            <embeddedTarget>/apps/core/email/install</embeddedTarget>
                             <embeddeds>
                                 <embedded>
                                     <groupId>${project.groupId}</groupId>
                                     <artifactId>core.email.components.core</artifactId>
-                                    <target>/apps/core/wcm/install</target>
+                                    <target>/apps/core/email/install</target>
                                 </embedded>
                                 <embedded>
                                     <groupId>org.apache.sling</groupId>
                                     <artifactId>org.apache.sling.models.impl</artifactId>
-                                    <target>/apps/core/wcm/install</target>
+                                    <target>/apps/core/email/install</target>
                                 </embedded>
                             </embeddeds>
                             <subPackages>

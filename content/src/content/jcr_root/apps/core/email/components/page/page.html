@@ -25,6 +25,7 @@
 <body class="${page.cssClassNames}"
       id="${page.id}"
       data-cmp-data-layer-enabled="${page.data ? true : false}">
+<div data-sly-test="${properties.preheader}" class="pre-header-text">${properties.preheader}</div>
     <sly data-sly-test="${emailPage.statusMessage}">
         <div class="coral-Alert coral-Alert--${emailPage.alertType} coral--light" style="margin:0; border-radius:0; -moz-border-radius:0; -webkit-border-radius:0;">
             <i class="coral-Alert-typeIcon coral-Icon coral-Icon--sizeS coral-Icon--adobeCampaign"></i>

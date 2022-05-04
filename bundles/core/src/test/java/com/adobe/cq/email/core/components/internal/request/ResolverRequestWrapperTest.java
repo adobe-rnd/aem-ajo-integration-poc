@@ -24,6 +24,8 @@ import io.wcm.testing.mock.aem.junit5.AemContextExtension;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 @ExtendWith(AemContextExtension.class)
 class ResolverRequestWrapperTest {
@@ -64,13 +66,12 @@ class ResolverRequestWrapperTest {
     @Test
     void getPathInfoTest() {
         ResolverRequestWrapper wrapper = new ResolverRequestWrapper(emptyRequest, URI_STRING);
-        assertNull(wrapper.getPathInfo());
+        assertTrue(wrapper.getPathInfo().isEmpty());
     }
 
     @Test
     void invalidUri() {
-        ResolverRequestWrapper wrapper = new ResolverRequestWrapper(emptyRequest, "123#?&$4_no_uri");
-        assertNull(wrapper.getServerName());
+        assertThrows(URIException.class, () -> new ResolverRequestWrapper(emptyRequest, "httpz:;\\//123#?&$4_no_uri"));
     }
 
 }

@@ -15,27 +15,25 @@
  ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~*/
 package com.adobe.cq.email.core.components.internal.request;
 
+import java.net.URI;
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletRequestWrapper;
+
 
 public class ResolverRequestWrapper extends HttpServletRequestWrapper {
 
     private final URI uri;
 
     /**
-     *
      * C'tor.
      *
-     * @param request
-     *            original request (with wrong host settings)
-     * @param uriString
-     *            uri string that should be resolved
-     * @throws URIException
-     *             if the uri object cannot be created
+     * @param request   original request (with wrong host settings)
+     * @param uriString uri string that should be resolved
+     * @throws URIException if the uri object cannot be created
      */
     public ResolverRequestWrapper(HttpServletRequest request, String uriString) throws URIException {
         super(request);
-        uri = new URI(uriString, false);
+        uri = create(uriString);
     }
 
     /**
@@ -51,11 +49,7 @@ public class ResolverRequestWrapper extends HttpServletRequestWrapper {
      */
     @Override
     public String getServerName() {
-        try {
-            return uri.getHost();
-        } catch (URIException ex) {
-            return null;
-        }
+        return uri.getHost();
     }
 
     /**
@@ -71,10 +65,14 @@ public class ResolverRequestWrapper extends HttpServletRequestWrapper {
      */
     @Override
     public String getPathInfo() {
+        return uri.getPath();
+    }
+
+    private URI create(String url) {
         try {
-            return uri.getPath();
-        } catch (URIException ex) {
-            return "";
+            return URI.create(url);
+        } catch (Throwable e) {
+            throw new URIException(1, "Error parsing URI: " + url + ", error: " + e.getMessage());
         }
     }
 }

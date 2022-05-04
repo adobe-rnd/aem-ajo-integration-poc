@@ -300,7 +300,7 @@ class ImageModelTest {
     @Test
     void getWidths_NullDelegate() {
         this.sut.delegate = null;
-        assertNull(sut.getWidths());
+        assertEquals(0, sut.getWidths().length);
     }
 
     @Test

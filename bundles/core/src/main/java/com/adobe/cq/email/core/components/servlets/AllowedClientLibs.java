@@ -73,7 +73,7 @@ public class AllowedClientLibs extends SlingSafeMethodsServlet {
         if (policyMgr != null) {
             ContentPolicy policy = policyMgr.getPolicy(contentResource);
             if (policy != null) {
-                Resource clientLibsRes = resolver.getResource(policy.getPath() + "/" + PN_ALLOWED_CLIENT_LIBS);
+                Resource clientLibsRes = resolver.getResource(policy.adaptTo(Resource.class), PN_ALLOWED_CLIENT_LIBS);
                 if (clientLibsRes == null) {
                     return Collections.emptyList();
                 }

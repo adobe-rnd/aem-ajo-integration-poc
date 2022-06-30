@@ -53,7 +53,7 @@ public class AllowedClientLibs extends SlingSafeMethodsServlet {
 
     protected static final String RESOURCE_TYPE = "core/email/components/commons/datasources/clientlibrarycategories/v1";
     protected static final String PN_ALLOWED_CLIENT_LIBS_PATH = "clientlibs";
-    protected static final String PN_ALLOWED_CLIENT_LIBS_NAME = "clientLibname";
+    protected static final String PN_ALLOWED_CLIENT_LIBS_NAME = "clientLibName";
     protected static final String PN_ALLOWED_CLIENT_LIBS = "clientlibs";
 
     @Override
@@ -74,7 +74,7 @@ public class AllowedClientLibs extends SlingSafeMethodsServlet {
         if (policyMgr != null) {
             ContentPolicy policy = policyMgr.getPolicy(contentResource);
             if (policy != null) {
-                Resource clientLibsRes = resolver.getResource(policy.adaptTo(Resource.class), PN_ALLOWED_CLIENT_LIBS);
+                Resource clientLibsRes = resolver.getResource(policy.adaptTo(Resource.class), PN_ALLOWED_CLIENT_LIBS_PATH);
                 if (clientLibsRes == null) {
                     return Collections.emptyList();
                 }

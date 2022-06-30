@@ -59,7 +59,7 @@
                                                     jcr:primaryType="nt:unstructured"
                                                     sling:resourceType="granite/ui/components/coral/foundation/form/textfield"
                                                     emptyText="Client Library Name"
-                                                    name="./clientLibname">
+                                                    name="./clientLibName">
                                                     <datasource
                                                         jcr:primaryType="nt:unstructured"
                                                         sling:resourceType="core/email/components/commons/datasources/clientlibrarycategories/v1"/>

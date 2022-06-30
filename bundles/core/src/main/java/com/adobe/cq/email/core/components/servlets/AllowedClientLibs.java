@@ -20,8 +20,6 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
-import java.util.Objects;
-
 import javax.servlet.Servlet;
 import javax.servlet.ServletException;
 
@@ -29,7 +27,6 @@ import org.apache.commons.lang3.StringUtils;
 import org.apache.sling.api.SlingHttpServletRequest;
 import org.apache.sling.api.SlingHttpServletResponse;
 import org.apache.sling.api.resource.Resource;
-import org.apache.sling.api.resource.ResourceMetadata;
 import org.apache.sling.api.resource.ResourceResolver;
 import org.apache.sling.api.resource.SyntheticResource;
 import org.apache.sling.api.resource.ValueMap;
@@ -45,9 +42,9 @@ import com.day.cq.wcm.api.policies.ContentPolicy;
 import com.day.cq.wcm.api.policies.ContentPolicyManager;
 
 @Component(
-        service = { Servlet.class },
+        service = {Servlet.class},
         property = {
-                "sling.servlet.resourceTypes="+ AllowedClientLibs.RESOURCE_TYPE,
+                "sling.servlet.resourceTypes=" + AllowedClientLibs.RESOURCE_TYPE,
                 "sling.servlet.methods=GET",
                 "sling.servlet.extensions=html"
         }
@@ -69,39 +66,41 @@ public class AllowedClientLibs extends SlingSafeMethodsServlet {
         List<Resource> clientLibs = new ArrayList<>();
         ResourceResolver resolver = request.getResourceResolver();
         Resource contentResource = resolver.getResource((String) request.getAttribute(Value.CONTENTPATH_ATTRIBUTE));
+        if (contentResource == null) {
+            return Collections.emptyList();
+        }
         ContentPolicyManager policyMgr = resolver.adaptTo(ContentPolicyManager.class);
         if (policyMgr != null) {
-            Resource clientRes = contentResource.getParent().getChild(PN_ALLOWED_CLIENT_LIBS);
-            if(clientRes == null){
-                return Collections.emptyList();
-            }
-            ContentPolicy policy = policyMgr.getPolicy(clientRes);
+            ContentPolicy policy = policyMgr.getPolicy(contentResource);
             if (policy != null) {
-                ValueMap clientLib = null;
-                ValueMap properties = policy.getProperties();
-                if (properties != null) {
-                    String[] allowedClientLibs = properties.get(PN_ALLOWED_CLIENT_LIBS, String[].class);
-                    if (allowedClientLibs != null && allowedClientLibs.length > 0) {
-                        for (String allowedClientLib : allowedClientLibs) {
-                            clientLib = new ValueMapDecorator(new HashMap<String, Object>());
-                            clientLib.put(PN_CLIENT_VALUE, allowedClientLib);
-                            clientLibs.add(new ElementResource(allowedClientLib, resolver));
-                        }
-                    }
+                Resource clientLibsRes = resolver.getResource(policy.getPath() + "/" + PN_ALLOWED_CLIENT_LIBS);
+                if (clientLibsRes == null) {
+                    return Collections.emptyList();
+                }
+                Iterable<Resource> children = clientLibsRes.getChildren();
+                for (Resource child : children) {
+                    ValueMap valueMap = child.getValueMap();
+                    String clientLibName = valueMap.get("clientLibname", String.class);
+                    String clientLibsValue = valueMap.get("clientlibs", String.class);
+                    clientLibs.add(new ElementResource(clientLibName, clientLibsValue, resolver));
                 }
             }
         }
         return clientLibs;
     }
+
     private static class ElementResource extends SyntheticResource {
 
         private final String elementName;
+        private final String elementValue;
         private ValueMap valueMap;
 
-        ElementResource(String headingElement, ResourceResolver resourceResolver) {
+        ElementResource(String headingElement, String elementValue, ResourceResolver resourceResolver) {
             super(resourceResolver, StringUtils.EMPTY, RESOURCE_TYPE_NON_EXISTING);
             this.elementName = headingElement;
+            this.elementValue = elementValue;
         }
+
         public <AdapterType> AdapterType adaptTo(Class<AdapterType> type) {
             if (type == ValueMap.class) {
                 if (this.valueMap == null) {
@@ -127,7 +126,7 @@ public class AllowedClientLibs extends SlingSafeMethodsServlet {
         }
 
         public String getValue() {
-            return elementName;
+            return elementValue;
         }
 
         public boolean getSelected() {

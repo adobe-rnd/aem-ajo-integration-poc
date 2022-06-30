@@ -52,8 +52,9 @@ import com.day.cq.wcm.api.policies.ContentPolicyManager;
 public class AllowedClientLibs extends SlingSafeMethodsServlet {
 
     protected static final String RESOURCE_TYPE = "core/email/components/commons/datasources/clientlibrarycategories/v1";
+    protected static final String PN_ALLOWED_CLIENT_LIBS_PATH = "clientlibs";
+    protected static final String PN_ALLOWED_CLIENT_LIBS_NAME = "clientLibname";
     protected static final String PN_ALLOWED_CLIENT_LIBS = "clientlibs";
-    protected static final String PN_CLIENT_VALUE = "value";
 
     @Override
     protected void doGet(@NotNull SlingHttpServletRequest request, @NotNull SlingHttpServletResponse response)
@@ -73,15 +74,15 @@ public class AllowedClientLibs extends SlingSafeMethodsServlet {
         if (policyMgr != null) {
             ContentPolicy policy = policyMgr.getPolicy(contentResource);
             if (policy != null) {
-                Resource clientLibsRes = resolver.getResource(policy.getPath() + "/" + PN_ALLOWED_CLIENT_LIBS);
+                Resource clientLibsRes = resolver.getResource(policy.getPath() + "/" + PN_ALLOWED_CLIENT_LIBS_PATH);
                 if (clientLibsRes == null) {
                     return Collections.emptyList();
                 }
                 Iterable<Resource> children = clientLibsRes.getChildren();
                 for (Resource child : children) {
                     ValueMap valueMap = child.getValueMap();
-                    String clientLibName = valueMap.get("clientLibname", String.class);
-                    String clientLibsValue = valueMap.get("clientlibs", String.class);
+                    String clientLibName = valueMap.get(PN_ALLOWED_CLIENT_LIBS_NAME, String.class);
+                    String clientLibsValue = valueMap.get(PN_ALLOWED_CLIENT_LIBS, String.class);
                     clientLibs.add(new ElementResource(clientLibName, clientLibsValue, resolver));
                 }
             }

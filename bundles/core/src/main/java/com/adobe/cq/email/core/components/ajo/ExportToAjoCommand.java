@@ -59,8 +59,6 @@ import org.osgi.service.metatype.annotations.ObjectClassDefinition;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import com.adobe.cq.email.core.components.configs.StylesInlinerConfig;
-import com.adobe.cq.email.core.components.services.AccLinkService;
 import com.adobe.cq.email.core.components.services.StylesInlinerService;
 import com.day.cq.commons.servlets.HtmlStatusResponseHelper;
 import com.day.cq.contentsync.handler.util.RequestResponseFactory;
@@ -73,8 +71,9 @@ import com.day.cq.wcm.api.commands.WCMCommandContext;
 @Component(service = WCMCommand.class, immediate = true)
 @Designate(ocd = ExportToAjoCommand.Config.class)
 public class ExportToAjoCommand implements WCMCommand {
-
     private final Logger log = LoggerFactory.getLogger(ExportToAjoCommand.class);
+
+    private static final String EXPORT_AS_TEMPLATE = "template";
 
     @ObjectClassDefinition(
         name = "Export To AJO",
@@ -127,67 +126,20 @@ public class ExportToAjoCommand implements WCMCommand {
                                        PageManager pageManager) {
         try {
 
+            String type = request.getParameter("type");
             String path = request.getParameter("path");
             String html = renderHtml(path, request.getResourceResolver());
 
-            String messageName = request.getParameter("messageName");
-            String senderName = request.getParameter("senderName");
-            String senderAddress = request.getParameter("senderAddress");
-            String subject = request.getParameter("subject");
-
-            CloseableHttpClient httpClient = HttpClientBuilder.create().build();
-            HttpPost post = new HttpPost("https://platform-stage.adobe.io/journey/authoring/message/messages");
-
-            post.setHeader(HttpHeaders.CONTENT_TYPE,"application/json");
-            post.setHeader(HttpHeaders.AUTHORIZATION, "Bearer " + config.imsUserToken());
-
-            post.setHeader("x-api-key", config.apiKey());
-            post.setHeader("x-gw-ims-org-id",config.orgId());
-            post.setHeader("x-sandbox-name",config.sandboxName());
-
-//            JSONObject htmlParam = new JSONObject();
-//            htmlParam.put("html", "<html><body>1</body></html>");
-//
-//            JSONObject json = new JSONObject();
-//            json.put("name", "Black Friday Sale - Header");
-//            json.put("description", "Black Friday Sale - Header");
-//            json.put("type", "email_html");
-//            json.put("template", htmlParam);
-
-            JSONObject emailHtml = new JSONObject();
-            emailHtml.put("body", html);
-
-            JSONObject emailVariant = new JSONObject();
-            emailVariant.put("name", "default");
-            emailVariant.put("subject", subject);
-            emailVariant.put("senderName", senderName);
-            emailVariant.put("senderAddress", senderAddress);
-            emailVariant.put("html", emailHtml);
-
-            JSONObject emailChannel = new JSONObject();
-            emailChannel.put("variants", new JSONArray(Arrays.asList(emailVariant)));
-
-            JSONObject channels = new JSONObject();
-            channels.put("email", emailChannel);
-
-            JSONObject message = new JSONObject();
-            message.put("name", messageName);
-            message.put("brandingPresetId", "56376772-9294-4d87-a781-ed27434ad64c");
-            message.put("channels", channels);
-
-            StringEntity params = new StringEntity(message.toString(), "UTF-8");
-            post.setEntity(params);
-
-            HttpResponse res = httpClient.execute(post);
-
-            log.info(EntityUtils.toString(res.getEntity(), "UTF-8"));
-
-            httpClient.close();
+            if (EXPORT_AS_TEMPLATE.equals(type)) {
+                exportAsTemplate(html, request.getParameterMap());
+            } else {
+                exportAsMessage(html, request.getParameterMap());
+            }
 
             return HtmlStatusResponseHelper.createStatusResponse(true, "Success!");
 
         } catch (ServletException | IOException | JSONException e) {
-            log.error("Error during export.", e);
+            log.error("Error during export", e);
             return HtmlStatusResponseHelper.createStatusResponse(false, I18n.get(request, e.getMessage()));
         }
     }
@@ -197,7 +149,8 @@ public class ExportToAjoCommand implements WCMCommand {
         this.config = config;
     }
 
-    private String renderHtml(String pagePath, ResourceResolver resourceResolver) throws ServletException, IOException {
+    private String renderHtml(String pagePath, ResourceResolver resourceResolver) throws ServletException, IOException
+    {
         Map<String, Object> params = new HashMap<>();
         HttpServletRequest req = requestResponseFactory.createRequest("GET", pagePath + ".html", params);
         WCMMode.DISABLED.toRequest(req);
@@ -208,16 +161,85 @@ public class ExportToAjoCommand implements WCMCommand {
         return stylesInlinerService.getHtmlWithInlineStyles(resourceResolver, out.toString(StandardCharsets.UTF_8.name()));
     }
 
-    private HtmlResponse fail(String msg) {
-        log.error(msg);
-        return HtmlStatusResponseHelper.createStatusResponse(false, msg);
+    private void exportAsTemplate(String html, Map<String, String[]> requestParams) throws JSONException, IOException
+    {
+        String name = requestParams.get("templateName")[0];
+        String description = requestParams.get("templateDescription")[0];
+
+        CloseableHttpClient httpClient = HttpClientBuilder.create().build();
+        HttpPost post = new HttpPost("https://platform-stage.adobe.io/journey/authoring/message/templates");
+
+        post.setHeader(HttpHeaders.CONTENT_TYPE,"application/vnd.adobe.cjm.template.v1+json");
+        post.setHeader(HttpHeaders.AUTHORIZATION, "Bearer " + config.imsUserToken());
+
+        post.setHeader("x-api-key", config.apiKey());
+        post.setHeader("x-gw-ims-org-id",config.orgId());
+        post.setHeader("x-sandbox-name",config.sandboxName());
+
+        JSONObject templateHtml = new JSONObject();
+        templateHtml.put("html", html);
+
+        JSONObject template = new JSONObject();
+        template.put("name", name);
+        template.put("description", description);
+        template.put("type", "email_html");
+        template.put("template", templateHtml);
+
+        StringEntity params = new StringEntity(template.toString(), "UTF-8");
+        post.setEntity(params);
+
+        HttpResponse res = httpClient.execute(post);
+
+        log.info(EntityUtils.toString(res.getEntity(), "UTF-8"));
+
+        httpClient.close();
     }
 
-    static String getParam(SlingHttpServletRequest request, String name) {
-        String value = request.getParameter(name);
-        if (value == null || value.equals("")) {
-            return null;
-        }
-        return value;
+    private void exportAsMessage(String html, Map<String, String[]> requestParams) throws JSONException, IOException
+    {
+        String messageName = requestParams.get("messageName")[0];
+        String senderName = requestParams.get("senderName")[0];
+        String senderAddress = requestParams.get("senderAddress")[0];
+        String subject = requestParams.get("subject")[0];
+
+        CloseableHttpClient httpClient = HttpClientBuilder.create().build();
+        HttpPost post = new HttpPost("https://platform-stage.adobe.io/journey/authoring/message/messages");
+
+        post.setHeader(HttpHeaders.CONTENT_TYPE,"application/json");
+        post.setHeader(HttpHeaders.AUTHORIZATION, "Bearer " + config.imsUserToken());
+
+        post.setHeader("x-api-key", config.apiKey());
+        post.setHeader("x-gw-ims-org-id",config.orgId());
+        post.setHeader("x-sandbox-name",config.sandboxName());
+
+        JSONObject emailHtml = new JSONObject();
+        emailHtml.put("body", html);
+
+        JSONObject emailVariant = new JSONObject();
+        emailVariant.put("name", "default");
+        emailVariant.put("subject", subject);
+        emailVariant.put("senderName", senderName);
+        emailVariant.put("senderAddress", senderAddress);
+        emailVariant.put("html", emailHtml);
+
+        JSONObject emailChannel = new JSONObject();
+        emailChannel.put("variants", new JSONArray(Arrays.asList(emailVariant)));
+
+        JSONObject channels = new JSONObject();
+        channels.put("email", emailChannel);
+
+        JSONObject message = new JSONObject();
+        message.put("name", messageName);
+        message.put("brandingPresetId", "56376772-9294-4d87-a781-ed27434ad64c");
+        message.put("channels", channels);
+
+        StringEntity params = new StringEntity(message.toString(), "UTF-8");
+        post.setEntity(params);
+
+        HttpResponse res = httpClient.execute(post);
+
+        log.info(EntityUtils.toString(res.getEntity(), "UTF-8"));
+
+        httpClient.close();
     }
 }

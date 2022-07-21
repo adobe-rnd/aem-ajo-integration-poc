@@ -15,92 +15,32 @@
  ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~*/
 package com.adobe.cq.email.core.components.ajo;
 
-import javax.servlet.ServletException;
-import javax.servlet.http.HttpServletRequest;
-import javax.servlet.http.HttpServletResponse;
-import java.io.ByteArrayOutputStream;
-import java.io.IOException;
-import java.nio.charset.StandardCharsets;
-import java.util.HashMap;
-import java.util.Map;
-
-import org.apache.http.HttpHeaders;
-import org.apache.http.HttpResponse;
-import org.apache.http.client.methods.HttpPost;
-import org.apache.http.entity.StringEntity;
-import org.apache.http.impl.client.CloseableHttpClient;
-import org.apache.http.impl.client.HttpClientBuilder;
-import org.apache.http.util.EntityUtils;
 import org.apache.sling.api.SlingHttpServletRequest;
 import org.apache.sling.api.SlingHttpServletResponse;
-import org.apache.sling.api.resource.ResourceResolver;
 import org.apache.sling.api.servlets.HtmlResponse;
-import org.apache.sling.engine.SlingRequestProcessor;
-import org.json.JSONException;
-import org.json.JSONObject;
-import org.osgi.service.component.annotations.Activate;
 import org.osgi.service.component.annotations.Component;
 import org.osgi.service.component.annotations.Reference;
-import org.osgi.service.metatype.annotations.AttributeDefinition;
-import org.osgi.service.metatype.annotations.Designate;
-import org.osgi.service.metatype.annotations.ObjectClassDefinition;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import com.adobe.cq.email.core.components.services.StylesInlinerService;
 import com.day.cq.commons.servlets.HtmlStatusResponseHelper;
-import com.day.cq.contentsync.handler.util.RequestResponseFactory;
 import com.day.cq.i18n.I18n;
 import com.day.cq.wcm.api.PageManager;
-import com.day.cq.wcm.api.WCMMode;
 import com.day.cq.wcm.api.commands.WCMCommand;
 import com.day.cq.wcm.api.commands.WCMCommandContext;
 
 @Component(service = WCMCommand.class, immediate = true)
-@Designate(ocd = ExportToAjoCommand.Config.class)
 public class ExportToAjoCommand implements WCMCommand {
+    public static final String PATH_PARAM = "path";
+    public static final String TEMPLATE_NAME_PARAM = "templateName";
+    public static final String TEMPLATE_DESCRIPTION_PARAM = "templateDescription";
     private final Logger log = LoggerFactory.getLogger(ExportToAjoCommand.class);
 
-    @ObjectClassDefinition(
-        name = "Export To AJO",
-        description = "Export To AJO"
-    )
-    @interface Config {
-        @AttributeDefinition(
-            name = "API Key",
-            description = "API Key"
-        )
-        String apiKey() default "cjm-authoring-ui";
-
-        @AttributeDefinition(
-            name = "Organization ID",
-            description = "Organization ID"
-        )
-        String orgId() default "745F37C35E4B776E0A49421B@AdobeOrg";
-
-        @AttributeDefinition(
-            name = "Sandbox name",
-            description = "Sandbox name"
-        )
-        String sandboxName() default "cjm-mr";
-
-        @AttributeDefinition(
-            name = "IMS User Token",
-            description = "Sandbox name"
-        )
-        String imsUserToken() default "";
-    }
+    @Reference
+    private transient EmailContentRenderer emailContentRenderer;
 
     @Reference
-    private transient RequestResponseFactory requestResponseFactory;
-
-    @Reference
-    private transient SlingRequestProcessor requestProcessor;
-
-    @Reference
-    private transient StylesInlinerService stylesInlinerService;
-
-    private Config config;
+    private transient EmailContentExporter emailContentExporter;
 
     public String getCommandName() {
         return "exportToAjo";
@@ -111,68 +51,18 @@ public class ExportToAjoCommand implements WCMCommand {
                                        SlingHttpServletResponse response,
                                        PageManager pageManager) {
         try {
+            String path = request.getParameter(PATH_PARAM);
+            String html = emailContentRenderer.render(path, request.getResourceResolver());
 
-            String path = request.getParameter("path");
-            String html = renderHtml(path, request.getResourceResolver());
-
-            exportAsTemplate(html, request.getParameterMap());
+            String name = request.getParameter(TEMPLATE_NAME_PARAM);
+            String description = request.getParameter(TEMPLATE_DESCRIPTION_PARAM);
+            emailContentExporter.export(html, name, description);
 
             return HtmlStatusResponseHelper.createStatusResponse(true, "Success!");
 
-        } catch (ServletException | IOException | JSONException e) {
+        } catch (AjoException e) {
             log.error("Error during export", e);
             return HtmlStatusResponseHelper.createStatusResponse(false, I18n.get(request, e.getMessage()));
         }
-    }
-
-    @Activate
-    protected void activate(Config config) {
-        this.config = config;
-    }
-
-    private String renderHtml(String pagePath, ResourceResolver resourceResolver) throws ServletException, IOException
-    {
-        Map<String, Object> params = new HashMap<>();
-        HttpServletRequest req = requestResponseFactory.createRequest("GET", pagePath + ".html", params);
-        WCMMode.DISABLED.toRequest(req);
-        ByteArrayOutputStream out = new ByteArrayOutputStream();
-        HttpServletResponse response = requestResponseFactory.createResponse(out);
-        response.setCharacterEncoding(StandardCharsets.UTF_8.name());
-        requestProcessor.processRequest(req, response, resourceResolver);
-        return stylesInlinerService.getHtmlWithInlineStyles(resourceResolver, out.toString(StandardCharsets.UTF_8.name()));
-    }
-
-    private void exportAsTemplate(String html, Map<String, String[]> requestParams) throws JSONException, IOException
-    {
-        String name = requestParams.get("templateName")[0];
-        String description = requestParams.get("templateDescription")[0];
-
-        CloseableHttpClient httpClient = HttpClientBuilder.create().build();
-        HttpPost post = new HttpPost("https://platform-stage.adobe.io/journey/authoring/message/templates");
-
-        post.setHeader(HttpHeaders.CONTENT_TYPE,"application/vnd.adobe.cjm.template.v1+json");
-        post.setHeader(HttpHeaders.AUTHORIZATION, "Bearer " + config.imsUserToken());
-
-        post.setHeader("x-api-key", config.apiKey());
-        post.setHeader("x-gw-ims-org-id",config.orgId());
-        post.setHeader("x-sandbox-name",config.sandboxName());
-
-        JSONObject templateHtml = new JSONObject();
-        templateHtml.put("html", html);
-
-        JSONObject template = new JSONObject();
-        template.put("name", name);
-        template.put("description", description);
-        template.put("type", "email_html");
-        template.put("template", templateHtml);
-
-        StringEntity params = new StringEntity(template.toString(), "UTF-8");
-        post.setEntity(params);
-
-        HttpResponse res = httpClient.execute(post);
-
-        log.info(EntityUtils.toString(res.getEntity(), "UTF-8"));
-
-        httpClient.close();
     }
 }

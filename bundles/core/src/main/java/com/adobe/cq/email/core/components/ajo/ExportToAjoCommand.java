@@ -20,39 +20,27 @@ import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
-import java.io.PrintWriter;
-import java.lang.annotation.Annotation;
 import java.nio.charset.StandardCharsets;
-import java.util.Arrays;
-import java.util.Collections;
 import java.util.HashMap;
 import java.util.Map;
 
-import org.apache.felix.scr.annotations.Service;
 import org.apache.http.HttpHeaders;
 import org.apache.http.HttpResponse;
-import org.apache.http.client.CredentialsProvider;
-import org.apache.http.client.HttpClient;
-import org.apache.http.client.methods.HttpGet;
 import org.apache.http.client.methods.HttpPost;
 import org.apache.http.entity.StringEntity;
 import org.apache.http.impl.client.CloseableHttpClient;
-import org.apache.http.impl.client.DefaultHttpClient;
 import org.apache.http.impl.client.HttpClientBuilder;
 import org.apache.http.util.EntityUtils;
 import org.apache.sling.api.SlingHttpServletRequest;
 import org.apache.sling.api.SlingHttpServletResponse;
-import org.apache.sling.api.resource.Resource;
 import org.apache.sling.api.resource.ResourceResolver;
 import org.apache.sling.api.servlets.HtmlResponse;
 import org.apache.sling.engine.SlingRequestProcessor;
-import org.json.JSONArray;
 import org.json.JSONException;
 import org.json.JSONObject;
 import org.osgi.service.component.annotations.Activate;
 import org.osgi.service.component.annotations.Component;
 import org.osgi.service.component.annotations.Reference;
-import org.osgi.service.component.annotations.ServiceScope;
 import org.osgi.service.metatype.annotations.AttributeDefinition;
 import org.osgi.service.metatype.annotations.Designate;
 import org.osgi.service.metatype.annotations.ObjectClassDefinition;
@@ -72,8 +60,6 @@ import com.day.cq.wcm.api.commands.WCMCommandContext;
 @Designate(ocd = ExportToAjoCommand.Config.class)
 public class ExportToAjoCommand implements WCMCommand {
     private final Logger log = LoggerFactory.getLogger(ExportToAjoCommand.class);
-
-    private static final String EXPORT_AS_TEMPLATE = "template";
 
     @ObjectClassDefinition(
         name = "Export To AJO",
@@ -126,15 +112,10 @@ public class ExportToAjoCommand implements WCMCommand {
                                        PageManager pageManager) {
         try {
 
-            String type = request.getParameter("type");
             String path = request.getParameter("path");
             String html = renderHtml(path, request.getResourceResolver());
 
-            if (EXPORT_AS_TEMPLATE.equals(type)) {
-                exportAsTemplate(html, request.getParameterMap());
-            } else {
-                exportAsMessage(html, request.getParameterMap());
-            }
+            exportAsTemplate(html, request.getParameterMap());
 
             return HtmlStatusResponseHelper.createStatusResponse(true, "Success!");
 
@@ -186,54 +167,6 @@ public class ExportToAjoCommand implements WCMCommand {
         template.put("template", templateHtml);
 
         StringEntity params = new StringEntity(template.toString(), "UTF-8");
-        post.setEntity(params);
-
-        HttpResponse res = httpClient.execute(post);
-
-        log.info(EntityUtils.toString(res.getEntity(), "UTF-8"));
-
-        httpClient.close();
-    }
-
-    private void exportAsMessage(String html, Map<String, String[]> requestParams) throws JSONException, IOException
-    {
-        String messageName = requestParams.get("messageName")[0];
-        String senderName = requestParams.get("senderName")[0];
-        String senderAddress = requestParams.get("senderAddress")[0];
-        String subject = requestParams.get("subject")[0];
-
-        CloseableHttpClient httpClient = HttpClientBuilder.create().build();
-        HttpPost post = new HttpPost("https://platform-stage.adobe.io/journey/authoring/message/messages");
-
-        post.setHeader(HttpHeaders.CONTENT_TYPE,"application/json");
-        post.setHeader(HttpHeaders.AUTHORIZATION, "Bearer " + config.imsUserToken());
-
-        post.setHeader("x-api-key", config.apiKey());
-        post.setHeader("x-gw-ims-org-id",config.orgId());
-        post.setHeader("x-sandbox-name",config.sandboxName());
-
-        JSONObject emailHtml = new JSONObject();
-        emailHtml.put("body", html);
-
-        JSONObject emailVariant = new JSONObject();
-        emailVariant.put("name", "default");
-        emailVariant.put("subject", subject);
-        emailVariant.put("senderName", senderName);
-        emailVariant.put("senderAddress", senderAddress);
-        emailVariant.put("html", emailHtml);
-
-        JSONObject emailChannel = new JSONObject();
-        emailChannel.put("variants", new JSONArray(Arrays.asList(emailVariant)));
-
-        JSONObject channels = new JSONObject();
-        channels.put("email", emailChannel);
-
-        JSONObject message = new JSONObject();
-        message.put("name", messageName);
-        message.put("brandingPresetId", "56376772-9294-4d87-a781-ed27434ad64c");
-        message.put("channels", channels);
-
-        StringEntity params = new StringEntity(message.toString(), "UTF-8");
         post.setEntity(params);
 
         HttpResponse res = httpClient.execute(post);

@@ -22,6 +22,7 @@ import java.util.Date;
 import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.stream.Collectors;
 import javax.json.Json;
 import javax.json.JsonObject;
 import javax.json.JsonObjectBuilder;
@@ -47,9 +48,11 @@ import org.slf4j.LoggerFactory;
 import com.adobe.cq.email.core.components.configs.StylesInlinerConfig;
 import com.adobe.cq.email.core.components.constants.StylesInlinerConstants;
 import com.adobe.cq.email.core.components.exceptions.StylesInlinerException;
+import com.adobe.cq.email.core.components.pojo.HtmlInlinerConfiguration;
 import com.adobe.cq.email.core.components.pojo.StyleSpecificity;
 import com.adobe.cq.email.core.components.pojo.StyleToken;
 import com.adobe.cq.email.core.components.services.StylesInlinerService;
+import com.adobe.cq.email.core.components.util.HtmlAttributeInliner;
 import com.adobe.cq.email.core.components.util.HtmlSanitizer;
 import com.adobe.cq.email.core.components.util.StyleExtractor;
 import com.adobe.cq.email.core.components.util.StyleMerger;
@@ -130,7 +133,7 @@ public class StylesInlinerServiceImpl implements StylesInlinerService {
             }
             String stylePlaceholder = "!!!STYLE_PLACEHOLDER_" + new Date().getTime() + "!!!";
             HtmlSanitizer.sanitizeDocument(doc);
-            applyStyles(doc, styleTokens);
+            applyStyles(doc, styleTokens, stylesInlinerConfig.htmlInlinerConfiguration());
             processStyle(doc, styleSb, stylePlaceholder, unInlinableStyleTokens);
             WrapperDivRemover.removeWrapperDivs(doc, stylesInlinerConfig.wrapperDivClassesToBeRemoved());
             String outerHtml = doc.outerHtml();
@@ -203,7 +206,14 @@ public class StylesInlinerServiceImpl implements StylesInlinerService {
         return styleToken;
     }
 
-    private void applyStyles(Document document, List<StyleToken> styleTokens) {
+    private void applyStyles(Document document, List<StyleToken> styleTokens, String[] htmlInlinerConfigurations) {
+        List<HtmlInlinerConfiguration> htmlInlinerConfigurationList = new ArrayList<>();
+        for (String htmlInlinerConfiguration : htmlInlinerConfigurations) {
+            HtmlInlinerConfiguration parsed = HtmlInlinerConfiguration.parse(htmlInlinerConfiguration);
+            if (Objects.nonNull(parsed)) {
+                htmlInlinerConfigurationList.add(parsed);
+            }
+        }
         for (StyleToken styleToken : styleTokens) {
             String elementSelector = styleToken.getSelector();
             for (Element elementToApply : document.select(elementSelector)) {
@@ -215,9 +225,14 @@ public class StylesInlinerServiceImpl implements StylesInlinerService {
                 StyleToken currentElement = StyleTokenFactory.create(elementSelector);
                 currentElement.setSpecificity(STYLE_SPECIFICITY);
                 StyleTokenFactory.addProperties(currentElement, currentElementStyle);
-                String style = StyleMerger.merge(currentElement, styleToken);
+                StyleToken mergedStyleToken = StyleMerger.merge(currentElement, styleToken);
+                String style = StyleTokenFactory.getInlinablePropertiesIgnoringNesting(mergedStyleToken);
                 if (StringUtils.isNotEmpty(style)) {
+                    String tagName = elementToApply.tagName();
                     elementToApply.attr(StylesInlinerConstants.STYLE_ATTRIBUTE, style);
+                    HtmlAttributeInliner.process(elementToApply, mergedStyleToken,
+                            htmlInlinerConfigurationList.stream().filter(c -> tagName.equals(c.getElementType()))
+                                    .collect(Collectors.toList()));
                 }
             }
         }
@@ -255,6 +270,12 @@ public class StylesInlinerServiceImpl implements StylesInlinerService {
             public String[] wrapperDivClassesToBeRemoved() {
                 return new String[]{"aem-Grid", "aem-GridColumn"};
             }
+
+            @Override
+            public String[] htmlInlinerConfiguration() {
+                return new String[]{HtmlInlinerConfiguration.IMG_WIDTH_DEFAULT};
+            }
+
         };
     }
 }

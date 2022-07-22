@@ -18,6 +18,7 @@ package com.adobe.cq.email.core.components.ajo;
 import org.apache.sling.api.SlingHttpServletRequest;
 import org.apache.sling.api.SlingHttpServletResponse;
 import org.apache.sling.api.servlets.HtmlResponse;
+import org.osgi.service.component.annotations.Activate;
 import org.osgi.service.component.annotations.Component;
 import org.osgi.service.component.annotations.Reference;
 import org.slf4j.Logger;
@@ -31,19 +32,27 @@ import com.day.cq.wcm.api.commands.WCMCommandContext;
 
 @Component(service = WCMCommand.class, immediate = true)
 public class ExportToAjoCommand implements WCMCommand {
+    private final Logger log = LoggerFactory.getLogger(ExportToAjoCommand.class);
+
     public static final String PATH_PARAM = "path";
     public static final String TEMPLATE_NAME_PARAM = "templateName";
     public static final String TEMPLATE_DESCRIPTION_PARAM = "templateDescription";
-    private final Logger log = LoggerFactory.getLogger(ExportToAjoCommand.class);
 
-    @Reference
+    public static final String WCM_COMMAND_NAME = "exportToAjo";
+
     private transient EmailContentRenderer emailContentRenderer;
-
-    @Reference
     private transient EmailContentExporter emailContentExporter;
 
+    @Activate
+    public ExportToAjoCommand(
+        @Reference EmailContentRenderer emailContentRenderer,
+        @Reference EmailContentExporter emailContentExporter) {
+        this.emailContentRenderer = emailContentRenderer;
+        this.emailContentExporter = emailContentExporter;
+    }
+
     public String getCommandName() {
-        return "exportToAjo";
+        return WCM_COMMAND_NAME;
     }
 
     public HtmlResponse performCommand(WCMCommandContext ctx,

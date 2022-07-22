@@ -26,6 +26,7 @@ import java.util.Map;
 
 import org.apache.sling.api.resource.ResourceResolver;
 import org.apache.sling.engine.SlingRequestProcessor;
+import org.osgi.service.component.annotations.Activate;
 import org.osgi.service.component.annotations.Component;
 import org.osgi.service.component.annotations.Reference;
 
@@ -38,24 +39,29 @@ import com.day.cq.wcm.api.WCMMode;
 @Component(service = EmailContentRenderer.class)
 public class EmailContentRendererImpl implements EmailContentRenderer {
 
-    @Reference
     private transient RequestResponseFactory requestResponseFactory;
-
-    @Reference
     private transient SlingRequestProcessor requestProcessor;
-
-    @Reference
     private transient StylesInlinerService stylesInlinerService;
+
+    @Activate
+    public EmailContentRendererImpl(
+        @Reference RequestResponseFactory requestResponseFactory,
+        @Reference SlingRequestProcessor requestProcessor,
+        @Reference StylesInlinerService stylesInlinerService) {
+        this.requestResponseFactory = requestResponseFactory;
+        this.requestProcessor = requestProcessor;
+        this.stylesInlinerService = stylesInlinerService;
+    }
 
     public String render(String path, ResourceResolver resourceResolver) throws AjoException {
         try {
             Map<String, Object> params = new HashMap<>();
-            HttpServletRequest req = requestResponseFactory.createRequest("GET", path + ".html", params);
-            WCMMode.DISABLED.toRequest(req);
+            HttpServletRequest request = requestResponseFactory.createRequest("GET", path + ".html", params);
+            WCMMode.DISABLED.toRequest(request);
             ByteArrayOutputStream out = new ByteArrayOutputStream();
             HttpServletResponse response = requestResponseFactory.createResponse(out);
             response.setCharacterEncoding(StandardCharsets.UTF_8.name());
-            requestProcessor.processRequest(req, response, resourceResolver);
+            requestProcessor.processRequest(request, response, resourceResolver);
             return stylesInlinerService.getHtmlWithInlineStyles(resourceResolver, out.toString(StandardCharsets.UTF_8.name()));
         } catch (ServletException | IOException e) {
             throw new AjoException("Error while rendering HTML", e);

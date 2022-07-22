@@ -28,9 +28,12 @@ import org.json.JSONException;
 import org.json.JSONObject;
 import org.osgi.service.component.annotations.Activate;
 import org.osgi.service.component.annotations.Component;
+import org.osgi.service.component.annotations.Deactivate;
 import org.osgi.service.metatype.annotations.AttributeDefinition;
 import org.osgi.service.metatype.annotations.Designate;
 import org.osgi.service.metatype.annotations.ObjectClassDefinition;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import com.adobe.cq.email.core.components.ajo.AjoException;
 import com.adobe.cq.email.core.components.ajo.EmailContentExporter;
@@ -40,8 +43,15 @@ import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
 @Component(service = EmailContentExporter.class)
 @Designate(ocd = EmailContentExporterImpl.Config.class)
 public class EmailContentExporterImpl implements EmailContentExporter {
+    private final Logger log = LoggerFactory.getLogger(EmailContentExporterImpl.class);
 
     public static final String TEMPLATES_ENDPOINT = "https://platform-stage.adobe.io/journey/authoring/message/templates";
+
+    public static final String CONTENT_TYPE = "application/vnd.adobe.cjm.template.v1+json";
+
+    public static final String API_KEY_HEADER = "x-api-key";
+    public static final String ORG_ID_HEADER = "x-gw-ims-org-id";
+    public static final String SANDBOX_NAME_HEADER = "x-sandbox-name";
 
     @ObjectClassDefinition(
         name = "Export To AJO",
@@ -73,20 +83,47 @@ public class EmailContentExporterImpl implements EmailContentExporter {
         String imsUserToken() default "";
     }
 
+    private CloseableHttpClient httpClient;
+
     private Config config;
+
+    @Activate
+    public EmailContentExporterImpl(Config config) {
+        this.config = config;
+    }
+
+    @Deactivate
+    public void deactivate() {
+        try {
+            httpClient.close();
+        } catch (IOException e) {
+            log.warn("Error while closing HttpClient", e);
+        }
+    }
+
+    public CloseableHttpClient getHttpClient() {
+        if (httpClient == null) {
+            httpClient = HttpClientBuilder.create().build();
+        }
+        return httpClient;
+    }
+
+    public void setHttpClient(CloseableHttpClient httpClient) {
+        this.httpClient = httpClient;
+    }
 
     @SuppressFBWarnings("RCN_REDUNDANT_NULLCHECK_WOULD_HAVE_BEEN_A_NPE")
     public void export(String html, String name, String description) throws AjoException {
 
-        try (CloseableHttpClient httpClient = HttpClientBuilder.create().build()) {
+        try (CloseableHttpClient httpClient = getHttpClient()) {
             HttpPost post = new HttpPost(TEMPLATES_ENDPOINT);
 
-            post.setHeader(HttpHeaders.CONTENT_TYPE, "application/vnd.adobe.cjm.template.v1+json");
+            post.setHeader(HttpHeaders.CONTENT_TYPE, CONTENT_TYPE);
             post.setHeader(HttpHeaders.AUTHORIZATION, "Bearer " + config.imsUserToken());
 
-            post.setHeader("x-api-key", config.apiKey());
-            post.setHeader("x-gw-ims-org-id", config.orgId());
-            post.setHeader("x-sandbox-name", config.sandboxName());
+            post.setHeader(API_KEY_HEADER, config.apiKey());
+            post.setHeader(ORG_ID_HEADER, config.orgId());
+            post.setHeader(SANDBOX_NAME_HEADER, config.sandboxName());
 
             JSONObject templateHtml = new JSONObject();
             templateHtml.put("html", html);
@@ -108,10 +145,5 @@ public class EmailContentExporterImpl implements EmailContentExporter {
         } catch (JSONException | IOException e) {
             throw new AjoException("Error while exporting to AJO", e);
         }
-    }
-
-    @Activate
-    protected void activate(Config config) {
-        this.config = config;
     }
 }

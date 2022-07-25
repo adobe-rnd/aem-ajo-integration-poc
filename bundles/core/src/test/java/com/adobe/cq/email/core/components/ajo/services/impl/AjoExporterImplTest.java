@@ -13,7 +13,7 @@
  ~ See the License for the specific language governing permissions and
  ~ limitations under the License.
  ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~*/
-package com.adobe.cq.email.core.components.ajo.impl;
+package com.adobe.cq.email.core.components.ajo.services.impl;
 
 import javax.servlet.ServletException;
 import java.io.IOException;
@@ -32,7 +32,6 @@ import com.adobe.cq.email.core.components.ajo.AjoException;
 import com.adobe.cq.email.core.components.services.StylesInlinerService;
 import com.day.cq.contentsync.handler.util.RequestResponseFactory;
 
-import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyMap;
@@ -42,10 +41,14 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
-class EmailContentRendererImplTest {
+class AjoExporterImplTest {
 
-    private static final String PATH = "/path1/path2";
-    private static final String HTML_OUTPUT = "html";
+    static final String TEMPLATE_NAME = "template name";
+    static final String TEMPLATE_DESCRIPTION = "template description";
+
+    static final String RESOURCE_PATH = "/path";
+
+    private static final String TEMPLATE_HTML = "html";
 
     @Mock
     RequestResponseFactory requestResponseFactory;
@@ -57,6 +60,9 @@ class EmailContentRendererImplTest {
     StylesInlinerService stylesInlinerService;
 
     @Mock
+    AjoConnectorImpl ajoConnector;
+
+    @Mock
     SlingHttpServletRequest slingHttpServletRequest;
 
     @Mock
@@ -65,29 +71,32 @@ class EmailContentRendererImplTest {
     @Mock
     ResourceResolver resourceResolver;
 
-    EmailContentRendererImpl sut;
+    AjoExporterImpl sut;
 
     @BeforeEach
     void setUp() {
-        when(requestResponseFactory.createRequest(eq("GET"), eq(PATH + ".html"), anyMap())).thenReturn(slingHttpServletRequest);
+        when(requestResponseFactory.createRequest(eq("GET"), eq(RESOURCE_PATH + ".html"), anyMap())).thenReturn(slingHttpServletRequest);
         when(requestResponseFactory.createResponse(any())).thenReturn(slingHttpServletResponse);
 
-        sut = new EmailContentRendererImpl(requestResponseFactory, requestProcessor, stylesInlinerService);
+        sut = new AjoExporterImpl(requestResponseFactory, requestProcessor, stylesInlinerService, ajoConnector);
     }
 
     @Test
-    void render() throws AjoException, ServletException, IOException {
-        when(stylesInlinerService.getHtmlWithInlineStyles(eq(resourceResolver), any())).thenReturn(HTML_OUTPUT);
-        String output = sut.render(PATH, resourceResolver);
-        assertEquals(HTML_OUTPUT, output);
+    void export() throws AjoException, ServletException, IOException {
+        when(stylesInlinerService.getHtmlWithInlineStyles(eq(resourceResolver), any())).thenReturn(TEMPLATE_HTML);
+        sut.export(TEMPLATE_NAME, TEMPLATE_DESCRIPTION, RESOURCE_PATH, resourceResolver);
+
         verify(requestProcessor).processRequest(slingHttpServletRequest, slingHttpServletResponse, resourceResolver);
+
+        verify(stylesInlinerService).getHtmlWithInlineStyles(eq(resourceResolver), any());
+        verify(ajoConnector).createTemplate(eq(TEMPLATE_NAME), eq(TEMPLATE_DESCRIPTION), eq(TEMPLATE_HTML));
     }
 
     @Test
     void throwsException() throws ServletException, IOException {
         doThrow(new ServletException()).when(requestProcessor).processRequest(any(), any(), any());
         assertThrows(AjoException.class, () -> {
-            sut.render(PATH, resourceResolver);
+            sut.export(TEMPLATE_NAME, TEMPLATE_DESCRIPTION, RESOURCE_PATH, resourceResolver);
         });
     }
 }

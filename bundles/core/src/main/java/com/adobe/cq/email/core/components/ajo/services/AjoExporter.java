@@ -13,10 +13,12 @@
  ~ See the License for the specific language governing permissions and
  ~ limitations under the License.
  ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~*/
-package com.adobe.cq.email.core.components.ajo;
+package com.adobe.cq.email.core.components.ajo.services;
 
 import org.apache.sling.api.resource.ResourceResolver;
 
-public interface EmailContentRenderer {
-    String render(String path, ResourceResolver resourceResolver) throws AjoException;
+import com.adobe.cq.email.core.components.ajo.AjoException;
+
+public interface AjoExporter {
+    void export(String name, String description, String path, ResourceResolver resourceResolver) throws AjoException;
 }

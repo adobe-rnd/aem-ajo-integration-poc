@@ -13,8 +13,10 @@
  ~ See the License for the specific language governing permissions and
  ~ limitations under the License.
  ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~*/
-package com.adobe.cq.email.core.components.ajo;
+package com.adobe.cq.email.core.components.ajo.services;
 
-public interface EmailContentExporter {
-    void export(String html, String name, String description) throws AjoException;
+import com.adobe.cq.email.core.components.ajo.AjoException;
+
+public interface AjoConnector {
+    void createTemplate(String name, String description, String content) throws AjoException;
 }

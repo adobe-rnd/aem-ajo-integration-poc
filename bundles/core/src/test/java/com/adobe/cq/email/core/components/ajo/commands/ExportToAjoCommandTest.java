@@ -13,7 +13,7 @@
  ~ See the License for the specific language governing permissions and
  ~ limitations under the License.
  ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~*/
-package com.adobe.cq.email.core.components.ajo;
+package com.adobe.cq.email.core.components.ajo.commands;
 
 import org.apache.http.HttpStatus;
 import org.apache.sling.api.SlingHttpServletRequest;
@@ -23,6 +23,9 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+
+import com.adobe.cq.email.core.components.ajo.AjoException;
+import com.adobe.cq.email.core.components.ajo.services.AjoExporter;
 
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.any;
@@ -34,25 +37,22 @@ import static org.mockito.Mockito.when;
 @ExtendWith(MockitoExtension.class)
 class ExportToAjoCommandTest {
 
-    private static final String PATH = "/path";
-    public static final String TEMPLATE_HTML = "html";
-    public static final String TEMPLATE_NAME = "template name";
-    public static final String TEMPLATE_DESCRIPTION = "template description";
+    static final String TEMPLATE_NAME = "template name";
+    static final String TEMPLATE_DESCRIPTION = "template description";
 
-    @Mock
-    EmailContentRenderer emailContentRenderer;
-
-    @Mock
-    EmailContentExporter emailContentExporter;
+    static final String RESOURCE_PATH = "/path";
 
     @Mock
     SlingHttpServletRequest slingHttpServletRequest;
+
+    @Mock
+    AjoExporter ajoExporter;
 
     ExportToAjoCommand sut;
 
     @BeforeEach
     void setUp() {
-        sut = new ExportToAjoCommand(emailContentRenderer, emailContentExporter);
+        sut = new ExportToAjoCommand(ajoExporter);
     }
 
     @Test
@@ -62,23 +62,24 @@ class ExportToAjoCommandTest {
 
     @Test
     void performCommand() throws AjoException {
-        when(slingHttpServletRequest.getParameter(ExportToAjoCommand.PATH_PARAM)).thenReturn(PATH);
-        when(slingHttpServletRequest.getParameter(ExportToAjoCommand.TEMPLATE_NAME_PARAM)).thenReturn(TEMPLATE_NAME);
-        when(slingHttpServletRequest.getParameter(ExportToAjoCommand.TEMPLATE_DESCRIPTION_PARAM)).thenReturn(TEMPLATE_DESCRIPTION);
-
-        when(emailContentRenderer.render(eq(PATH), any())).thenReturn(TEMPLATE_HTML);
+        when(slingHttpServletRequest.getParameter(eq(ExportToAjoCommand.PATH_PARAM))).thenReturn(RESOURCE_PATH);
+        when(slingHttpServletRequest.getParameter(eq(ExportToAjoCommand.TEMPLATE_NAME_PARAM))).thenReturn(TEMPLATE_NAME);
+        when(slingHttpServletRequest.getParameter(eq(ExportToAjoCommand.TEMPLATE_DESCRIPTION_PARAM))).thenReturn(TEMPLATE_DESCRIPTION);
 
         HtmlResponse response = sut.performCommand(null, slingHttpServletRequest, null, null);
 
         assertEquals(HttpStatus.SC_OK, response.getStatusCode());
 
-        verify(emailContentRenderer).render(eq(PATH), any());
-        verify(emailContentExporter).export(eq(TEMPLATE_HTML), eq(TEMPLATE_NAME), eq(TEMPLATE_DESCRIPTION));
+        verify(ajoExporter).export(
+            eq(TEMPLATE_NAME),
+            eq(TEMPLATE_DESCRIPTION),
+            eq(RESOURCE_PATH),
+            any());
     }
 
     @Test
     void performCommandReturnsBadStatus() throws AjoException {
-        doThrow(new AjoException()).when(emailContentRenderer).render(any(), any());
+        doThrow(new AjoException()).when(ajoExporter).export(any(), any(), any(), any());
         HtmlResponse response = sut.performCommand(null, slingHttpServletRequest, null, null);
         assertEquals(HttpStatus.SC_INTERNAL_SERVER_ERROR, response.getStatusCode());
     }

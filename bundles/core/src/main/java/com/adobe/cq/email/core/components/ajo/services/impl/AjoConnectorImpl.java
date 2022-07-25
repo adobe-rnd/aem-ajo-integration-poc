@@ -13,7 +13,7 @@
  ~ See the License for the specific language governing permissions and
  ~ limitations under the License.
  ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~*/
-package com.adobe.cq.email.core.components.ajo.impl;
+package com.adobe.cq.email.core.components.ajo.services.impl;
 
 import java.io.IOException;
 
@@ -36,18 +36,17 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import com.adobe.cq.email.core.components.ajo.AjoException;
-import com.adobe.cq.email.core.components.ajo.EmailContentExporter;
+import com.adobe.cq.email.core.components.ajo.services.AjoConnector;
 
 import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
 
-@Component(service = EmailContentExporter.class)
-@Designate(ocd = EmailContentExporterImpl.Config.class)
-public class EmailContentExporterImpl implements EmailContentExporter {
-    private final Logger log = LoggerFactory.getLogger(EmailContentExporterImpl.class);
+@Component(service = AjoConnector.class)
+@Designate(ocd = AjoConnectorImpl.Config.class)
+public class AjoConnectorImpl implements AjoConnector {
+    private final Logger log = LoggerFactory.getLogger(AjoConnectorImpl.class);
 
     public static final String TEMPLATES_ENDPOINT = "https://platform-stage.adobe.io/journey/authoring/message/templates";
-
-    public static final String CONTENT_TYPE = "application/vnd.adobe.cjm.template.v1+json";
+    public static final String TEMPLATES_CONTENT_TYPE = "application/vnd.adobe.cjm.template.v1+json";
 
     public static final String API_KEY_HEADER = "x-api-key";
     public static final String ORG_ID_HEADER = "x-gw-ims-org-id";
@@ -88,37 +87,18 @@ public class EmailContentExporterImpl implements EmailContentExporter {
     private Config config;
 
     @Activate
-    public EmailContentExporterImpl(Config config) {
+    public AjoConnectorImpl(Config config) {
         this.config = config;
     }
 
-    @Deactivate
-    public void deactivate() {
-        try {
-            httpClient.close();
-        } catch (IOException e) {
-            log.warn("Error while closing HttpClient", e);
-        }
-    }
-
-    public CloseableHttpClient getHttpClient() {
-        if (httpClient == null) {
-            httpClient = HttpClientBuilder.create().build();
-        }
-        return httpClient;
-    }
-
-    public void setHttpClient(CloseableHttpClient httpClient) {
-        this.httpClient = httpClient;
-    }
-
+    @Override
     @SuppressFBWarnings("RCN_REDUNDANT_NULLCHECK_WOULD_HAVE_BEEN_A_NPE")
-    public void export(String html, String name, String description) throws AjoException {
+    public void createTemplate(String name, String description, String content) throws AjoException {
 
         try (CloseableHttpClient httpClient = getHttpClient()) {
             HttpPost post = new HttpPost(TEMPLATES_ENDPOINT);
 
-            post.setHeader(HttpHeaders.CONTENT_TYPE, CONTENT_TYPE);
+            post.setHeader(HttpHeaders.CONTENT_TYPE, TEMPLATES_CONTENT_TYPE);
             post.setHeader(HttpHeaders.AUTHORIZATION, "Bearer " + config.imsUserToken());
 
             post.setHeader(API_KEY_HEADER, config.apiKey());
@@ -126,7 +106,7 @@ public class EmailContentExporterImpl implements EmailContentExporter {
             post.setHeader(SANDBOX_NAME_HEADER, config.sandboxName());
 
             JSONObject templateHtml = new JSONObject();
-            templateHtml.put("html", html);
+            templateHtml.put("html", content);
 
             JSONObject template = new JSONObject();
             template.put("name", name);
@@ -144,6 +124,26 @@ public class EmailContentExporterImpl implements EmailContentExporter {
             }
         } catch (JSONException | IOException e) {
             throw new AjoException("Error while exporting to AJO", e);
+        }
+    }
+
+    public CloseableHttpClient getHttpClient() {
+        if (httpClient == null) {
+            httpClient = HttpClientBuilder.create().build();
+        }
+        return httpClient;
+    }
+
+    public void setHttpClient(CloseableHttpClient httpClient) {
+        this.httpClient = httpClient;
+    }
+
+    @Deactivate
+    public void deactivate() {
+        try {
+            httpClient.close();
+        } catch (IOException e) {
+            log.warn("Error while closing HttpClient", e);
         }
     }
 }

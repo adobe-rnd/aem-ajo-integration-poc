@@ -13,7 +13,7 @@
  ~ See the License for the specific language governing permissions and
  ~ limitations under the License.
  ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~*/
-package com.adobe.cq.email.core.components.ajo;
+package com.adobe.cq.email.core.components.ajo.commands;
 
 import org.apache.sling.api.SlingHttpServletRequest;
 import org.apache.sling.api.SlingHttpServletResponse;
@@ -24,6 +24,8 @@ import org.osgi.service.component.annotations.Reference;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import com.adobe.cq.email.core.components.ajo.services.AjoExporter;
+import com.adobe.cq.email.core.components.ajo.AjoException;
 import com.day.cq.commons.servlets.HtmlStatusResponseHelper;
 import com.day.cq.i18n.I18n;
 import com.day.cq.wcm.api.PageManager;
@@ -40,15 +42,11 @@ public class ExportToAjoCommand implements WCMCommand {
 
     public static final String WCM_COMMAND_NAME = "exportToAjo";
 
-    private transient EmailContentRenderer emailContentRenderer;
-    private transient EmailContentExporter emailContentExporter;
+    private transient AjoExporter ajoExporter;
 
     @Activate
-    public ExportToAjoCommand(
-        @Reference EmailContentRenderer emailContentRenderer,
-        @Reference EmailContentExporter emailContentExporter) {
-        this.emailContentRenderer = emailContentRenderer;
-        this.emailContentExporter = emailContentExporter;
+    public ExportToAjoCommand(@Reference AjoExporter ajoExporter) {
+        this.ajoExporter = ajoExporter;
     }
 
     public String getCommandName() {
@@ -60,15 +58,13 @@ public class ExportToAjoCommand implements WCMCommand {
                                        SlingHttpServletResponse response,
                                        PageManager pageManager) {
         try {
-            String path = request.getParameter(PATH_PARAM);
-            String html = emailContentRenderer.render(path, request.getResourceResolver());
-
             String name = request.getParameter(TEMPLATE_NAME_PARAM);
             String description = request.getParameter(TEMPLATE_DESCRIPTION_PARAM);
-            emailContentExporter.export(html, name, description);
+            String path = request.getParameter(PATH_PARAM);
+
+            ajoExporter.export(name, description, path, request.getResourceResolver());
 
             return HtmlStatusResponseHelper.createStatusResponse(true, "Success!");
-
         } catch (AjoException e) {
             log.error("Error during export", e);
             return HtmlStatusResponseHelper.createStatusResponse(false, I18n.get(request, e.getMessage()));

@@ -13,7 +13,7 @@
  ~ See the License for the specific language governing permissions and
  ~ limitations under the License.
  ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~*/
-package com.adobe.cq.email.core.components.ajo.impl;
+package com.adobe.cq.email.core.components.ajo.services.impl;
 
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
@@ -37,8 +37,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 
 import com.adobe.cq.email.core.components.ajo.AjoException;
 
-import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.lenient;
@@ -46,7 +45,7 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
-class EmailContentExporterImplTest {
+class AjoConnectorImplTest {
 
     public static final String API_KEY = "key";
     public static final String IMS_USER_TOKEN = "token";
@@ -68,12 +67,12 @@ class EmailContentExporterImplTest {
     CloseableHttpResponse httpResponse;
 
     @Mock
-    EmailContentExporterImpl.Config config;
+    AjoConnectorImpl.Config config;
 
     @Captor
     ArgumentCaptor<HttpPost> httpPostArgumentCaptor;
 
-    EmailContentExporterImpl sut;
+    AjoConnectorImpl sut;
 
     @BeforeEach
     void setUp() {
@@ -82,48 +81,48 @@ class EmailContentExporterImplTest {
         lenient().when(config.orgId()).thenReturn(ORG_ID);
         lenient().when(config.sandboxName()).thenReturn(SANDBOX_NAME);
 
-        sut = new EmailContentExporterImpl(config);
+        sut = new AjoConnectorImpl(config);
         sut.setHttpClient(httpClient);
     }
 
     @Test
-    void export() throws AjoException, IOException, JSONException {
+    void createTemplate() throws AjoException, IOException, JSONException {
         when(httpResponse.getStatusLine()).thenReturn(new BasicStatusLine(
             new ProtocolVersion("HTTP", 1, 1), HttpStatus.SC_OK, ""));
         when(httpClient.execute(any())).thenReturn(httpResponse);
 
-        sut.export(TEMPLATE_HTML, TEMPLATE_NAME, TEMPLATE_DESCRIPTION);
+        sut.createTemplate(TEMPLATE_NAME, TEMPLATE_DESCRIPTION, TEMPLATE_HTML);
 
         verify(httpClient).execute(httpPostArgumentCaptor.capture());
 
         HttpPost httpPost = httpPostArgumentCaptor.getValue();
 
-        assertEquals(EmailContentExporterImpl.CONTENT_TYPE, httpPost.getFirstHeader(HttpHeaders.CONTENT_TYPE).getValue());
+        assertEquals(AjoConnectorImpl.TEMPLATES_CONTENT_TYPE, httpPost.getFirstHeader(HttpHeaders.CONTENT_TYPE).getValue());
         assertEquals("Bearer " + config.imsUserToken(), httpPost.getFirstHeader(HttpHeaders.AUTHORIZATION).getValue());
 
-        assertEquals(config.apiKey(), httpPost.getFirstHeader(EmailContentExporterImpl.API_KEY_HEADER).getValue());
-        assertEquals(config.orgId(), httpPost.getFirstHeader(EmailContentExporterImpl.ORG_ID_HEADER).getValue());
-        assertEquals(config.sandboxName(), httpPost.getFirstHeader(EmailContentExporterImpl.SANDBOX_NAME_HEADER).getValue());
+        assertEquals(config.apiKey(), httpPost.getFirstHeader(AjoConnectorImpl.API_KEY_HEADER).getValue());
+        assertEquals(config.orgId(), httpPost.getFirstHeader(AjoConnectorImpl.ORG_ID_HEADER).getValue());
+        assertEquals(config.sandboxName(), httpPost.getFirstHeader(AjoConnectorImpl.SANDBOX_NAME_HEADER).getValue());
 
         String payload = IOUtils.toString(httpPost.getEntity().getContent(), StandardCharsets.UTF_8);
         assertEquals(payload, TEMPLATE_PAYLOAD);
     }
 
     @Test
-    void exportReturnsBadStatusCode() throws IOException {
+    void createTemplateReturnsBadStatusCode() throws IOException {
         when(httpResponse.getStatusLine()).thenReturn(new BasicStatusLine(
             new ProtocolVersion("HTTP", 1, 1), HttpStatus.SC_INTERNAL_SERVER_ERROR, ""));
         when(httpClient.execute(any())).thenReturn(httpResponse);
         assertThrows(AjoException.class, () -> {
-            sut.export(TEMPLATE_HTML, TEMPLATE_NAME, TEMPLATE_DESCRIPTION);
+            sut.createTemplate(TEMPLATE_NAME, TEMPLATE_DESCRIPTION, TEMPLATE_HTML);
         });
     }
 
     @Test
-    void exportThrowsException() throws IOException {
+    void createTemplateThrowsException() throws IOException {
         doThrow(new IOException()).when(httpClient).execute(any());
         assertThrows(AjoException.class, () -> {
-            sut.export(TEMPLATE_HTML, TEMPLATE_NAME, TEMPLATE_DESCRIPTION);
+            sut.createTemplate(TEMPLATE_NAME, TEMPLATE_DESCRIPTION, TEMPLATE_HTML);
         });
     }
 
@@ -132,4 +131,5 @@ class EmailContentExporterImplTest {
         sut.deactivate();
         verify(httpClient).close();
     }
+
 }

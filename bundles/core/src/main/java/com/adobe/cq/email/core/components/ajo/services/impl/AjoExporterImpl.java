@@ -13,7 +13,7 @@
  ~ See the License for the specific language governing permissions and
  ~ limitations under the License.
  ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~*/
-package com.adobe.cq.email.core.components.ajo.impl;
+package com.adobe.cq.email.core.components.ajo.services.impl;
 
 import javax.servlet.ServletException;
 import javax.servlet.http.HttpServletRequest;
@@ -29,31 +29,45 @@ import org.apache.sling.engine.SlingRequestProcessor;
 import org.osgi.service.component.annotations.Activate;
 import org.osgi.service.component.annotations.Component;
 import org.osgi.service.component.annotations.Reference;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import com.adobe.cq.email.core.components.ajo.AjoException;
-import com.adobe.cq.email.core.components.ajo.EmailContentRenderer;
+import com.adobe.cq.email.core.components.ajo.services.AjoConnector;
+import com.adobe.cq.email.core.components.ajo.services.AjoExporter;
 import com.adobe.cq.email.core.components.services.StylesInlinerService;
 import com.day.cq.contentsync.handler.util.RequestResponseFactory;
 import com.day.cq.wcm.api.WCMMode;
 
-@Component(service = EmailContentRenderer.class)
-public class EmailContentRendererImpl implements EmailContentRenderer {
+@Component(service = AjoExporter.class)
+public class AjoExporterImpl implements AjoExporter {
+    private final Logger log = LoggerFactory.getLogger(AjoExporterImpl.class);
 
-    private transient RequestResponseFactory requestResponseFactory;
-    private transient SlingRequestProcessor requestProcessor;
-    private transient StylesInlinerService stylesInlinerService;
+    private final transient RequestResponseFactory requestResponseFactory;
+    private final transient SlingRequestProcessor requestProcessor;
+    private final transient StylesInlinerService stylesInlinerService;
+    private final transient AjoConnector ajoConnector;
 
     @Activate
-    public EmailContentRendererImpl(
+    public AjoExporterImpl(
         @Reference RequestResponseFactory requestResponseFactory,
         @Reference SlingRequestProcessor requestProcessor,
-        @Reference StylesInlinerService stylesInlinerService) {
+        @Reference StylesInlinerService stylesInlinerService,
+        @Reference AjoConnector ajoConnector) {
         this.requestResponseFactory = requestResponseFactory;
         this.requestProcessor = requestProcessor;
         this.stylesInlinerService = stylesInlinerService;
+        this.ajoConnector = ajoConnector;
     }
 
-    public String render(String path, ResourceResolver resourceResolver) throws AjoException {
+    @Override
+    public void export(String name, String description, String path, ResourceResolver resourceResolver) throws AjoException {
+        String html = renderHtml(path, resourceResolver);
+        String htmlWithInlinedStyles = stylesInlinerService.getHtmlWithInlineStyles(resourceResolver, html);
+        ajoConnector.createTemplate(name, description, htmlWithInlinedStyles);
+    }
+
+    private String renderHtml(String path, ResourceResolver resourceResolver) throws AjoException {
         try {
             Map<String, Object> params = new HashMap<>();
             HttpServletRequest request = requestResponseFactory.createRequest("GET", path + ".html", params);
@@ -62,7 +76,7 @@ public class EmailContentRendererImpl implements EmailContentRenderer {
             HttpServletResponse response = requestResponseFactory.createResponse(out);
             response.setCharacterEncoding(StandardCharsets.UTF_8.name());
             requestProcessor.processRequest(request, response, resourceResolver);
-            return stylesInlinerService.getHtmlWithInlineStyles(resourceResolver, out.toString(StandardCharsets.UTF_8.name()));
+            return out.toString(StandardCharsets.UTF_8.name());
         } catch (ServletException | IOException e) {
             throw new AjoException("Error while rendering HTML", e);
         }
